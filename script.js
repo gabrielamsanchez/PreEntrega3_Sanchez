@@ -89,6 +89,12 @@ function AgregarAlCarrito(e){
 } 
 }
 
+function modificarTotal(){
+    let carrito = obtenerCarrito()
+    let nodoTotal = document.getElementById("montoTotal")
+    nodoTotal.innerText = carrito ? carrito.reduce((acum,prod) => acum + prod.subtotal, 0) : 0
+}
+
 function renderizarCarrito(){
     let carrito = obtenerCarrito()
     
@@ -107,6 +113,7 @@ function renderizarCarrito(){
         `
         contenedor.append(item)
     }) 
+    modificarTotal()
 
 } 
 
@@ -124,3 +131,4 @@ function obtenerCarrito (){
     }
     return carrito
 }
+
