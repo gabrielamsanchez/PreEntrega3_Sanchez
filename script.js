@@ -1,19 +1,17 @@
+async function pedirDatosAlBackend(){
+    try {
+        const response = await fetch("./datos.json")
+        const info = await response.json()
+    } catch (error) {
+        lanzarAlerta("Algo salió mal, error: " + error)
+    }
 
-let productos = [
-    { id: 1, nombre: "Monstera", categoria: "exterior", stock: 5, precio: 13000, rutaImagen: "Monstera.png" },
-    { id: 2, nombre: "Calathea", categoria: "exterior", stock: 7, precio: 15500, rutaImagen: "calathea.png" },
-    { id: 3, nombre: "Limonero", categoria: "exterior", stock: 4, precio: 17800, rutaImagen: "limonero-1.png" },
-    { id: 4, nombre: "Gomero", categoria: "exterior", stock: 9, precio: 11000, rutaImagen: "gomero.png" },
-    { id: 5, nombre: "Zebrinha", categoria: "interior", stock: 4, precio: 7100, rutaImagen: "zebrinha.png" },
-    {   id: 6, nombre: "Philodendron", categoria: "interior", stock: 7, precio: 850, rutaImagen: "Philodendron.png" },
-]
+}
 
-let carrito = []
-
-principal (productos)
 
 function principal (productos){
     renderizarProductos(productos)
+    renderizarCarrito()
         let input = document.getElementById("input")
         input.addEventListener("input", filtrarTarjetas)
         let botonBuscador = document.getElementById("botonBuscador")
@@ -26,6 +24,7 @@ function principal (productos){
         botonVerOcultar.addEventListener("click", VerOcultarProductosCarrito)
 }
 
+
 function VerOcultarProductosCarrito(e){
     let seccionVentas = document.getElementById("seccionVentas")
     let seccionCarrito = document.getElementById("seccionCarrito")
@@ -37,55 +36,59 @@ function VerOcultarProductosCarrito(e){
 } 
 
 function finalizarCompra(){
-    alert("¡Gracias por comprar en Verdecora!")
+    lanzarAlerta("¡Gracias por comprar en Verdecora!", "Su compra fue realizada con éxito",  "success", 1500)
 localStorage.removeItem("carrito")
-carrito = []
 renderizarCarrito()
 }
 
 function renderizarProductos(productos){
     let contenedor = document.getElementById("productos")
         contenedor.innerHTML = ""
-        productos.forEach(producto => {
+        productos.forEach(( {rutaImagen, nombre, precio, stock, id }) => {
             
                 let tarjetaProd = document.createElement("div")
                 tarjetaProd.className = "producto"
 
                 tarjetaProd.innerHTML = `
-                    <img src="./media/${producto.rutaImagen}" />
-                    <h3>${producto.nombre}</h3>
-                    <h4>${producto.precio}</h4>
-                    <button id=${producto.id}>Agregar al carrito</button>
+                    <img src="./media/${rutaImagen}" />
+                    <h3>${nombre}</h3>
+                    <h4>${precio}</h4>
+                    <button id=${id}>Agregar al carrito</button>
+                    
                 `
-
                 contenedor.append(tarjetaProd)
-                let btnAgrCar = document.getElementById(producto.id)
+                let btnAgrCar = document.getElementById(id)
                 btnAgrCar.addEventListener("click", AgregarAlCarrito)
+                
             })
 }  
 function AgregarAlCarrito(e){
-    let idBotonProducto = Number(e.target.id)
-    let productoBuscado = productos.find(producto => producto.id === idBotonProducto)
-    let productoEnCarrito = carrito.find(producto => producto.id === idBotonProducto)
+    let carrito = obtenerCarrito()
+    let productos = obtenerProductos()
 
-    if(productoBuscado.stock > 0) {
+    let idBotonProducto = Number(e.target.id)
+    let productoBuscado = productos.find(({ id }) => id === idBotonProducto)
+    let { id, nombre, precio, stock } = productoBuscado
+    let productoEnCarrito = carrito.find(( { id }) => id === idBotonProducto)
+
+    if(stock > 0) {
         productoBuscado.stock--
         if(productoEnCarrito){
             productoEnCarrito.unidades++
             productoEnCarrito.subtotal = productoEnCarrito.precioUnitario * productoEnCarrito.unidades
     } else {
         carrito.push({
-            id: productoBuscado.id,
-            precio: productoBuscado.precio,
-            nombre: productoBuscado.nombre,
-            precioUnitario: productoBuscado.precio,
+            id,
+            nombre,
+            precioUnitario: precio,
             unidades: 1,
-            subtotal: productoBuscado.precio
+            subtotal: precio
         })
     }
-    renderizarCarrito()
     localStorage.setItem("carrito", JSON.stringify(carrito))
     renderizarCarrito()
+    
+    lanzarTostada("Producto agregado", 2000, "bottom", "center")
 } 
 }
 
@@ -101,22 +104,81 @@ function renderizarCarrito(){
     let contenedor = document.getElementById("carrito")
     contenedor.innerHTML = ""
     
-    carrito.forEach(producto => {
-        let item = document.createElement("tr")
-        item.innerText = producto.nombre + " " + producto.precioUnitario + " " + producto.precio + " " + producto.unidades + " " + producto.subtotal
-        item.innerHTML = ` 
-        <td>${producto.nombre}</td>
-        <td>${producto.precioUnitario}</td>
-        <td>${producto.unidades}</td>
-        <td>${producto.subtotal}</td>
-        
+    carrito.forEach(( { id, nombre, precioUnitario, unidades, subtotal}) => {
+        let item = document.createElement("tr") 
+        item.id = "prodCarrito" + id
+        item.innerHTML = `
+        <td>${nombre}</td>
+        <td>${precioUnitario}</td>
+        <td>
+        <button id=menos${id}> - </button>
+        <p id=unidades${id}>${unidades}</p>
+        <button id=mas${id}> + </button>
+        </td>
+        <td id=subtotal${id}>${subtotal}</td>
         `
         contenedor.append(item)
+
+        let botonMenos = document.getElementById(`menos${id}`)
+        botonMenos.addEventListener("click", restarUnidad)
+        let botonMas= document.getElementById(`mas${id}`)
+        botonMas.addEventListener("click", sumarUnidad)
     }) 
     modificarTotal()
-
 } 
 
+function restarUnidad(e){
+    let id = Number(e.target.id.substring(5))
+    let infoProductoEnCarrito = document.getElementById("prodCarrito" + id)
+    let carrito = obtenerCarrito()
+
+    let posProductoEnCarrito = carrito.findIndex(producto => producto.id = id)
+    
+    if (carrito[posProductoEnCarrito].unidades > 1){
+        let cantUnidades = document.getElementById("unidades" + id)
+        cantUnidades.innerText = Number(cantUnidades.innerText) - 1
+        carrito[posProductoEnCarrito].unidades--
+
+        let subtotal = document.getElementById("subtotal" + id)
+        subtotal.innerText = carrito[posProductoEnCarrito].precioUnitario * carrito[posProductoEnCarrito].unidades
+        carrito[posProductoEnCarrito].subtotal = carrito[posProductoEnCarrito].precioUnitario * carrito[posProductoEnCarrito].unidades
+
+        localStorage.setItem("carrito", JSON.stringify(carrito))
+    } else {
+        carrito.splice(posProductoEnCarrito, 1)
+        localStorage.setItem("carrito", JSON.stringify(carrito))
+
+        infoProductoEnCarrito.remove()
+    } 
+
+    modificarTotal()
+}
+
+function sumarUnidad(e){
+    let id = Number(e.target.id.substring(3))
+    let productos = obtenerProductos()
+    let infoProductoEnArrayOriginal = productos.find(producto => producto.id === id)
+    let carrito = obtenerCarrito()
+
+    let posProductoEnCarrito = carrito.findIndex (producto => producto.id = id)
+
+    if (carrito[posProductoEnCarrito].unidades < infoProductoEnArrayOriginal.stock) {
+        let cantUnidades = document.getElementById("unidades" + id)
+        cantUnidades.innerText = Number(cantUnidades.innerText) + 1
+        carrito[posProductoEnCarrito].unidades++
+
+        let subtotal = document.getElementById("subtotal" + id)
+        subtotal.innerText = carrito[posProductoEnCarrito].precioUnitario * carrito[posProductoEnCarrito].unidades
+        carrito[posProductoEnCarrito].subtotal = carrito[posProductoEnCarrito].precioUnitario * carrito[posProductoEnCarrito].unidades
+
+    }  else {
+        localStorage.setItem("carrito", JSON.stringify(carrito))
+
+        modificarTotal()
+    }
+
+
+}
 
 function filtrarTarjetas(){
     let productosFiltrados = productos.filter(producto => producto.nombre.includes(input.value))
@@ -125,10 +187,33 @@ function filtrarTarjetas(){
 
 
 function obtenerCarrito (){
-    let carrito = []
-    if (localStorage.getItem("carrito")){
-        carrito = JSON.parse(localStorage.getItem("carrito"))
-    }
-    return carrito
+    return localStorage.getItem("carrito") ? JSON.parse(localStorage.getItem("carrito")) : []
 }
 
+function lanzarAlerta(title, text, icon, timer){
+    Swal.fire({
+        title,
+        text,
+        icon: icon,
+        timer,
+        showConfirmButton: false,
+    });
+}
+
+function lanzarTostada(text, duration, gravity, position){
+    Toastify({
+        text,
+        duration,
+        gravity,
+        position,
+        style: {
+            background: "linear-gradient(to right, #00b09b, #96c93d)",
+        },
+    }) .showToast();
+
+}
+
+fetch("./datos.json")
+    .then(resp => resp.json())
+    .then(info => console.log(info))
+    .catch(error => console.log(error))
